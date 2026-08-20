@@ -1,0 +1,94 @@
+{
+  "name": "markdown-bridge",
+  "productName": "Markdown Bridge",
+  "desktopName": "markdown-bridge.desktop",
+  "version": "1.0.0",
+  "description": "Side-by-side Markdown and rich-text editor. The right pane shows formatted text, not tags — so pasting from Word, an AI answer or a web page just works, in both directions.",
+  "license": "MIT",
+  "author": "Oscar Dias <oscar.dias@softerize.com>",
+  "homepage": "https://github.com/oscardias/markdown-bridge#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/oscardias/markdown-bridge.git"
+  },
+  "bugs": {
+    "url": "https://github.com/oscardias/markdown-bridge/issues"
+  },
+  "keywords": [
+    "markdown",
+    "html",
+    "editor",
+    "electron",
+    "converter",
+    "rich-text",
+    "paste",
+    "clipboard",
+    "turndown",
+    "marked",
+    "wysiwyg"
+  ],
+  "type": "commonjs",
+  "main": "main.js",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "start": "electron .",
+    "start:x11": "electron --ozone-platform=x11 --disable-gpu .",
+    "test": "electron test/smoke.js",
+    "test:x11": "electron --no-sandbox --disable-gpu --ozone-platform=x11 test/smoke.js",
+    "test:ci": "xvfb-run -a electron --no-sandbox --disable-gpu test/smoke.js",
+    "screenshot": "electron scripts/screenshot.js",
+    "screenshot:x11": "electron --no-sandbox --disable-gpu --ozone-platform=x11 scripts/screenshot.js",
+    "dist": "electron-builder --publish never",
+    "dist:linux": "electron-builder --linux --publish never",
+    "icon": "electron scripts/icon.js",
+    "icon:x11": "electron --no-sandbox --disable-gpu --ozone-platform=x11 scripts/icon.js"
+  },
+  "dependencies": {
+    "dompurify": "^3.4.14",
+    "marked": "^18.0.7",
+    "turndown": "^7.2.4",
+    "turndown-plugin-gfm": "^1.0.2"
+  },
+  "devDependencies": {
+    "electron": "^43.2.0",
+    "electron-builder": "^26.15.3"
+  },
+  "build": {
+    "appId": "com.oscardias.markdown-bridge",
+    "productName": "Markdown Bridge",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "main.js",
+      "src/**/*",
+      "LICENSE"
+    ],
+    "linux": {
+      "target": [
+        "AppImage",
+        "deb"
+      ],
+      "category": "Office",
+      "synopsis": "Side-by-side Markdown and rich-text editor",
+      "syncDesktopName": true,
+      "executableName": "markdown-bridge",
+      "maintainer": "Oscar Dias <oscar.dias@softerize.com>"
+    },
+    "win": {
+      "target": [
+        "nsis",
+        "portable"
+      ]
+    },
+    "mac": {
+      "target": [
+        "dmg"
+      ],
+      "category": "public.app-category.productivity"
+    },
+    "icon": "build/icon.png"
+  }
+}

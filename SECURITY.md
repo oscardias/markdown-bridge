@@ -1,0 +1,42 @@
+# Security Policy
+
+Markdown Bridge exists to accept content from arbitrary sources — web pages, email,
+Word documents, AI assistants — so pasted input is treated as hostile by default.
+
+## Threat model
+
+The app is a local desktop editor. It makes no network requests, has no accounts and
+stores nothing but a local draft in `localStorage`. The realistic risk is **content
+injection**: a crafted `text/html` payload on the clipboard, or markdown with embedded
+HTML, executing script inside the renderer.
+
+Mitigations in place:
+
+- `nodeIntegration: false` and `contextIsolation: true` — the renderer has no Node
+  access; it talks to the main process only through the narrow `window.api` bridge in
+  [src/preload.js](src/preload.js), which whitelists the channels it will forward.
+- A restrictive CSP in [src/index.html](src/index.html): `default-src 'none'`,
+  `script-src 'self'` — no remote code, no `eval`.
+- Every path into the preview goes through `DOMPurify`: markdown rendered by `marked`,
+  HTML pasted from the clipboard, and HTML typed directly. `script`, `style`, `iframe`,
+  `object`, `embed`, `form`, `on*` handlers, inline `style` attributes and `javascript:`
+  URLs are removed.
+- External links are opened with `shell.openExternal` in the default browser and never
+  navigated to inside the window.
+
+The smoke test covers this directly: pasting `<script>alert(1)</script>` and rendering
+markdown containing `[x](javascript:alert(1))` must leave the preview clean and the
+renderer un-executed.
+
+## Known limitations
+
+- Released binaries are **not code-signed or notarized**.
+- Exported HTML (`Ctrl+E`) is sanitized, but it is still a document you may republish
+  elsewhere — review it before publishing content that came from an untrusted source.
+
+## Reporting a vulnerability
+
+Please report security issues privately through
+[GitHub Security Advisories](https://github.com/oscardias/markdown-bridge/security/advisories/new)
+rather than a public issue. Include a reproduction — for injection bugs, the exact
+clipboard payload or markdown input. Expect a first response within a few days.

@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self';"
+    />
+    <title>Markdown Bridge</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <header class="toolbar">
+      <div class="brand">Markdown&nbsp;Bridge</div>
+
+      <div class="actions">
+        <button id="btn-open" type="button" title="Open file (Ctrl+O)">Open</button>
+        <button id="btn-save" type="button" title="Save markdown (Ctrl+S)">Save</button>
+        <button id="btn-export" type="button" title="Export HTML (Ctrl+E)">Export HTML</button>
+        <span class="sep"></span>
+        <button id="btn-copy-md" type="button" title="Copy markdown (Ctrl+Shift+C)">Copy MD</button>
+        <button id="btn-copy-rich" type="button" title="Copy formatted (Ctrl+Shift+H)">
+          Copy formatted
+        </button>
+        <button id="btn-copy-html" type="button" title="Copy HTML source">Copy HTML</button>
+        <span class="sep"></span>
+        <label class="switch" title="Sync scrolling between panes (Ctrl+L)">
+          <input id="chk-sync" type="checkbox" checked />
+          <span>Synced scrolling</span>
+        </label>
+        <button id="btn-theme" type="button" title="Toggle theme (Ctrl+D)">Theme</button>
+      </div>
+    </header>
+
+    <main class="panes" id="panes">
+      <section class="pane" id="pane-md">
+        <div class="pane-head">
+          <h2>Markdown <small>plain text</small></h2>
+          <span class="hint">paste text here</span>
+        </div>
+        <textarea
+          id="markdown"
+          class="editor"
+          spellcheck="false"
+          placeholder="# Write or paste markdown here…"
+        ></textarea>
+      </section>
+
+      <div class="gutter" id="gutter" role="separator" aria-orientation="vertical" tabindex="0"></div>
+
+      <section class="pane" id="pane-html">
+        <div class="pane-head">
+          <h2>HTML <small>formatted</small></h2>
+          <span class="hint">paste formatted content here</span>
+        </div>
+        <div
+          id="preview"
+          class="preview"
+          contenteditable="true"
+          spellcheck="false"
+          role="textbox"
+          aria-multiline="true"
+        ></div>
+      </section>
+    </main>
+
+    <footer class="status">
+      <span id="status-source">editing: markdown</span>
+      <span id="status-counts"></span>
+      <span id="status-msg" class="msg"></span>
+    </footer>
+
+    <script src="../node_modules/marked/lib/marked.umd.js"></script>
+    <script src="../node_modules/turndown/lib/turndown.browser.umd.js"></script>
+    <script src="../node_modules/turndown-plugin-gfm/dist/turndown-plugin-gfm.js"></script>
+    <script src="../node_modules/dompurify/dist/purify.min.js"></script>
+    <script src="renderer.js"></script>
+  </body>
+</html>
