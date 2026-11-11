@@ -2,7 +2,7 @@
   "name": "markdown-bridge",
   "productName": "Markdown Bridge",
   "desktopName": "markdown-bridge.desktop",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Side-by-side Markdown and rich-text editor. The right pane shows formatted text, not tags — so pasting from Word, an AI answer or a web page just works, in both directions.",
   "license": "MIT",
   "author": "Oscar Dias <oscar.dias@softerize.com>",
@@ -43,7 +43,8 @@
     "dist": "electron-builder --publish never",
     "dist:linux": "electron-builder --linux --publish never",
     "icon": "electron scripts/icon.js",
-    "icon:x11": "electron --no-sandbox --disable-gpu --ozone-platform=x11 scripts/icon.js"
+    "icon:x11": "electron --no-sandbox --disable-gpu --ozone-platform=x11 scripts/icon.js",
+    "checksums": "node scripts/checksums.js"
   },
   "dependencies": {
     "dompurify": "^3.4.14",
@@ -58,6 +59,7 @@
   "build": {
     "appId": "com.oscardias.markdown-bridge",
     "productName": "Markdown Bridge",
+    "artifactName": "${name}-${version}-${arch}.${ext}",
     "directories": {
       "output": "dist"
     },
@@ -83,9 +85,21 @@
         "portable"
       ]
     },
+    "nsis": {
+      "artifactName": "${name}-${version}-setup-${arch}.${ext}"
+    },
+    "portable": {
+      "artifactName": "${name}-${version}-portable-${arch}.${ext}"
+    },
     "mac": {
       "target": [
-        "dmg"
+        {
+          "target": "dmg",
+          "arch": [
+            "x64",
+            "arm64"
+          ]
+        }
       ],
       "category": "public.app-category.productivity"
     },

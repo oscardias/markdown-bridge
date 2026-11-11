@@ -5,8 +5,14 @@ Word documents, AI assistants — so pasted input is treated as hostile by defau
 
 ## Threat model
 
-The app is a local desktop editor. It makes no network requests, has no accounts and
-stores nothing but a local draft in `localStorage`. The realistic risk is **content
+The app is a local desktop editor. It has no accounts and stores nothing but a local
+draft in `localStorage` and a small `settings.json` in the user data folder. Its only
+network request is the update check: an anonymous `GET` to
+`https://api.github.com/repos/oscardias/markdown-bridge/releases/latest`, made from the
+main process (never the renderer), at most once a day in packaged builds, and possible
+to turn off under **Help**. Nothing about the user or their documents is sent, and the
+response is only used to compare version numbers; the download link it carries is opened
+in the browser only if it points back at this repository's releases. The realistic risk is **content
 injection**: a crafted `text/html` payload on the clipboard, or markdown with embedded
 HTML, executing script inside the renderer.
 
@@ -30,7 +36,9 @@ renderer un-executed.
 
 ## Known limitations
 
-- Released binaries are **not code-signed or notarized**.
+- Released binaries are **not code-signed or notarized**. SHA-256 checksums are
+  published with each release instead (see the README's *Checking the download*).
+  Updates are never installed automatically — the app only links to the release page.
 - Exported HTML (`Ctrl+E`) is sanitized, but it is still a document you may republish
   elsewhere — review it before publishing content that came from an untrusted source.
 

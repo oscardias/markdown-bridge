@@ -1,9 +1,10 @@
 'use strict';
 
-const { app, BrowserWindow, Menu, clipboard, dialog, ipcMain, shell } = require('electron');
+const { app, BrowserWindow, Menu, clipboard, dialog, ipcMain, net, shell } = require('electron');
 const path = require('node:path');
 const fs = require('node:fs/promises');
 const { buildContextMenuTemplate } = require('./src/context-menu');
+const updates = require('./src/update-check');
 
 /** Path of the markdown file open in the window (null = new document). */
 let currentPath = null;
@@ -13,6 +14,10 @@ let win = null;
 let isDirty = false;
 /** Keeps us out of the confirmation dialog once the user has already decided. */
 let allowClose = false;
+
+/** Small JSON file in userData: update-check preferences. */
+const SETTINGS_FILE = () => path.join(app.getPath('userData'), 'settings.json');
+let settings = {};
 
 const MD_FILTERS = [
   { name: 'Markdown', extensions: ['md', 'markdown', 'mdown', 'txt'] },
@@ -159,6 +164,104 @@ async function exportHtml(html) {
   return { saved: true, path: filePath };
 }
 
+// ---- settings -------------------------------------------------------------
+
+async function loadSettings() {
+  try {
+    settings = JSON.parse(await fs.readFile(SETTINGS_FILE(), 'utf8')) || {};
+  } catch {
+    settings = {}; // first run or unreadable file: defaults
+  }
+}
+
+async function saveSettings(patch) {
+  settings = { ...settings, ...patch };
+  try {
+    await fs.mkdir(path.dirname(SETTINGS_FILE()), { recursive: true });
+    await fs.writeFile(SETTINGS_FILE(), JSON.stringify(settings, null, 2), 'utf8');
+  } catch (err) {
+    console.error('Could not save settings:', err);
+  }
+}
+
+// ---- update check ---------------------------------------------------------
+
+/** The only network request the app makes: GitHub's "latest release" endpoint. */
+async function fetchLatestRelease() {
+  const res = await net.fetch(updates.LATEST_RELEASE_API, {
+    headers: {
+      Accept: 'application/vnd.github+json',
+      'User-Agent': `markdown-bridge/${app.getVersion()}`,
+    },
+    signal: AbortSignal.timeout(15000),
+  });
+  if (res.status === 404) return null; // no published release yet
+  if (!res.ok) throw new Error(`GitHub answered HTTP ${res.status}`);
+  return updates.parseRelease(await res.json());
+}
+
+/**
+ * manual = true  → from the Help menu: always reports the outcome, errors included.
+ * manual = false → at startup: silent unless there is a new version to offer.
+ */
+async function checkForUpdates({ manual = false } = {}) {
+  let release;
+  try {
+    release = await fetchLatestRelease();
+    await saveSettings({ lastUpdateCheck: Date.now() });
+  } catch (err) {
+    if (manual) {
+      dialog.showMessageBox(win ?? undefined, {
+        type: 'error',
+        message: 'Could not check for updates.',
+        detail: `${err.message}\n\nYou can check manually at ${updates.RELEASES_PAGE}`,
+      });
+    }
+    return;
+  }
+
+  const current = app.getVersion();
+  const verdict = updates.evaluateRelease(release, current, {
+    skippedVersion: settings.skippedVersion,
+    manual,
+  });
+
+  if (verdict === 'current') {
+    if (manual) {
+      dialog.showMessageBox(win ?? undefined, {
+        type: 'info',
+        message: 'Markdown Bridge is up to date.',
+        detail: `You are running version ${current}.`,
+      });
+    }
+    return;
+  }
+  if (verdict === 'skipped') return;
+
+  const notes = updates.summarizeNotes(release.notes);
+  const { response } = await dialog.showMessageBox(win ?? undefined, {
+    type: 'info',
+    buttons: ['Download', 'Later', 'Skip this version'],
+    defaultId: 0,
+    cancelId: 1,
+    message: `Markdown Bridge ${release.version} is available.`,
+    detail:
+      `You are running ${current}. The download page opens in your browser; ` +
+      'install the new version over the current one.' +
+      (notes ? `\n\n${notes}` : ''),
+  });
+
+  if (response === 0) shell.openExternal(release.url);
+  if (response === 2) await saveSettings({ skippedVersion: release.version });
+}
+
+/** Startup check: packaged builds only, at most once a day, never blocks the window. */
+function scheduleAutoUpdateCheck() {
+  if (!app.isPackaged || process.env.MARKDOWN_BRIDGE_NO_UPDATE_CHECK) return;
+  if (!updates.shouldAutoCheck(settings)) return;
+  setTimeout(() => checkForUpdates(), 5000);
+}
+
 function buildMenu() {
   const isMac = process.platform === 'darwin';
 
@@ -223,6 +326,27 @@ function buildMenu() {
         { role: 'toggleDevTools', label: 'Developer tools' },
       ],
     },
+    {
+      role: 'help',
+      label: 'Help',
+      submenu: [
+        { label: 'Check for updates…', click: () => checkForUpdates({ manual: true }) },
+        {
+          label: 'Check for updates at startup',
+          type: 'checkbox',
+          checked: settings.checkForUpdates !== false,
+          click: (item) => saveSettings({ checkForUpdates: item.checked }),
+        },
+        { type: 'separator' },
+        { label: 'Releases', click: () => shell.openExternal(updates.RELEASES_PAGE) },
+        {
+          label: 'Report an issue',
+          click: () => shell.openExternal(`https://github.com/${updates.REPO}/issues`),
+        },
+        { type: 'separator' },
+        { label: `Version ${app.getVersion()}`, enabled: false },
+      ],
+    },
   ];
 
   Menu.setApplicationMenu(Menu.buildFromTemplate(template));
@@ -241,9 +365,11 @@ ipcMain.on('doc:dirty', (_e, dirty) => updateTitle(Boolean(dirty)));
 
 // ---- lifecycle ------------------------------------------------------------
 
-app.whenReady().then(() => {
+app.whenReady().then(async () => {
+  await loadSettings();
   buildMenu();
   createWindow();
+  scheduleAutoUpdateCheck();
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();
