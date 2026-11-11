@@ -9,6 +9,7 @@
 const { app, BrowserWindow } = require('electron');
 const path = require('node:path');
 const { buildContextMenuTemplate } = require('../src/context-menu');
+const updates = require('../src/update-check');
 
 const ROOT = path.join(__dirname, '..');
 const consoleLogs = [];
@@ -211,6 +212,65 @@ app.whenReady().then(async () => {
     'every item carries a label',
     noSelection.items.every((i) => i.type === 'separator' || typeof i.label === 'string'),
     noSelection.items
+  );
+
+  // ---- update check (pure logic; no network) ----
+  const cmp = updates.compareVersions;
+  check(
+    'version ordering follows semver',
+    cmp('1.0.0', '1.0.1') === -1 &&
+      cmp('v1.10.0', '1.9.9') === 1 &&
+      cmp('2.0.0', 'v2.0.0') === 0 &&
+      cmp('1.1.0-beta.2', '1.1.0') === -1 &&
+      cmp('1.1.0-beta.10', '1.1.0-beta.2') === 1 &&
+      cmp('1.1.0-alpha', '1.1.0-beta') === -1,
+    null
+  );
+
+  const release = updates.parseRelease({
+    tag_name: 'v1.2.0',
+    html_url: 'https://github.com/oscardias/markdown-bridge/releases/tag/v1.2.0',
+    body: 'Notes',
+  });
+  check(
+    'release payload is parsed; drafts, pre-releases and junk tags are ignored',
+    release?.version === '1.2.0' &&
+      release.url.endsWith('/tag/v1.2.0') &&
+      updates.parseRelease({ tag_name: 'v9.0.0', draft: true }) === null &&
+      updates.parseRelease({ tag_name: 'v9.0.0', prerelease: true }) === null &&
+      updates.parseRelease({ tag_name: 'nightly' }) === null &&
+      updates.parseRelease(null) === null,
+    release
+  );
+  check(
+    'release URL pointing outside the repository falls back to the releases page',
+    updates.parseRelease({ tag_name: 'v1.2.0', html_url: 'https://evil.example/x' }).url ===
+      updates.RELEASES_PAGE,
+    null
+  );
+
+  const ev = updates.evaluateRelease;
+  check(
+    'newer release → update; same/older → current; skipped only silences auto checks',
+    ev(release, '1.0.0') === 'update' &&
+      ev(release, '1.2.0') === 'current' &&
+      ev(release, '1.3.0') === 'current' &&
+      ev(null, '1.0.0') === 'current' &&
+      ev(release, '1.0.0', { skippedVersion: '1.2.0' }) === 'skipped' &&
+      ev(release, '1.0.0', { skippedVersion: '1.2.0', manual: true }) === 'update' &&
+      ev(release, '1.0.0', { skippedVersion: '1.1.0' }) === 'update',
+    null
+  );
+
+  const DAY = updates.AUTO_CHECK_INTERVAL_MS;
+  const now = 10 * DAY;
+  check(
+    'automatic check runs at most once a day and can be turned off',
+    updates.shouldAutoCheck({}, now) === true &&
+      updates.shouldAutoCheck({ lastUpdateCheck: now - DAY / 2 }, now) === false &&
+      updates.shouldAutoCheck({ lastUpdateCheck: now - DAY }, now) === true &&
+      updates.shouldAutoCheck({ checkForUpdates: false }, now) === false,
+    null
   );
 
   const failed = checks.filter((c) => !c.ok);

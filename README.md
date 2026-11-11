@@ -27,7 +27,72 @@ workflow.
 Both panes are editable and stay in sync in both directions. Scrolling is mirrored
 proportionally (and can be turned off).
 
-## Install and run
+## Download
+
+Grab the file for your system from the
+[latest release](https://github.com/oscardias/markdown-bridge/releases/latest):
+
+| System | File | Notes |
+| --- | --- | --- |
+| Windows 10/11 | `markdown-bridge-<version>-setup-x64.exe` | installer, adds a Start menu entry |
+| Windows (no install) | `markdown-bridge-<version>-portable-x64.exe` | runs from anywhere, e.g. a USB stick |
+| macOS, Apple Silicon (M1–M4) | `markdown-bridge-<version>-arm64.dmg` | |
+| macOS, Intel | `markdown-bridge-<version>-x64.dmg` | |
+| Linux, Debian/Ubuntu | `markdown-bridge-<version>-amd64.deb` | `sudo apt install ./markdown-bridge-*.deb` |
+| Linux, any distro | `markdown-bridge-<version>-x86_64.AppImage` | `chmod +x` it, then run it |
+
+### About the security warning on first launch
+
+The installers are **not code-signed** yet — signing certificates cost money and this
+is a free project. The app is the same either way, but your system cannot tell who
+built it, so it warns you the first time. This is expected; here is how to get past it.
+
+**Windows — "Windows protected your PC" (SmartScreen).** Click **More info**, then
+**Run anyway**. Some browsers also flag the download as uncommon: choose **Keep**.
+
+**macOS — "Markdown Bridge can't be opened" / "Apple could not verify…".** Drag the app
+to *Applications*, try to open it once, then go to **System Settings → Privacy &
+Security**, scroll down and click **Open Anyway**. On older macOS versions,
+right-click (or Control-click) the app and choose **Open** instead.
+If macOS says the app **"is damaged and can't be opened"**, that is the quarantine
+flag on an unsigned download, not real damage. Clear it from Terminal:
+
+```bash
+xattr -dr com.apple.quarantine "/Applications/Markdown Bridge.app"
+```
+
+**Linux.** No warning. For the AppImage, mark it executable first
+(`chmod +x markdown-bridge-*.AppImage`); on Ubuntu 22.04+ it may also need
+`sudo apt install libfuse2`.
+
+### Checking the download
+
+Each release lists SHA-256 checksums (`SHA256SUMS-linux.txt`, `SHA256SUMS-win32.txt`,
+`SHA256SUMS-darwin.txt`), produced by the same job that built the files. Compare them
+with what you downloaded:
+
+```bash
+sha256sum -c SHA256SUMS-linux.txt --ignore-missing      # Linux
+shasum -a 256 -c SHA256SUMS-darwin.txt --ignore-missing # macOS
+```
+
+```powershell
+Get-FileHash .\markdown-bridge-*-setup-x64.exe -Algorithm SHA256   # Windows
+```
+
+### Updates
+
+The app checks GitHub for a newer release once a day at startup. When there is one, it
+offers to open the download page — download the new file and install it over the
+current version; your settings and draft are kept. You can also check any time with
+**Help → Check for updates…**, or turn the automatic check off in the same menu.
+
+The check is a single anonymous request to the GitHub API
+(`api.github.com/repos/oscardias/markdown-bridge/releases/latest`); nothing about you or
+your documents is sent. Updates are not installed automatically: unsigned apps cannot
+replace themselves safely on macOS, so the app only tells you and lets you decide.
+
+## Run from source
 
 Requires Node.js 20 or newer.
 
@@ -44,10 +109,7 @@ On Wayland sessions where Electron crashes on startup:
 npm run start:x11    # electron --ozone-platform=x11 --disable-gpu .
 ```
 
-Prebuilt binaries for Linux (AppImage, deb), Windows (installer, portable) and macOS
-(dmg) are attached to each [release](https://github.com/oscardias/markdown-bridge/releases).
-They are **not code-signed**, so macOS Gatekeeper and Windows SmartScreen will warn on
-first launch.
+When running from source the update check only runs from the Help menu.
 
 ## Shortcuts
 
@@ -91,11 +153,13 @@ The markdown being edited is kept in `localStorage` as a draft and restored on l
 | [main.js](main.js) | main process: window, menus, file dialogs, IPC |
 | [src/preload.js](src/preload.js) | the `window.api` bridge (contextIsolation on, no Node in the renderer) |
 | [src/context-menu.js](src/context-menu.js) | right-click menu template (pure function, tested) |
+| [src/update-check.js](src/update-check.js) | version comparison and release parsing for the update check (pure, tested) |
 | [src/index.html](src/index.html) | pane layout and library loading |
 | [src/renderer.js](src/renderer.js) | conversion, sync, paste, copy, theme, divider |
 | [src/styles.css](src/styles.css) | light/dark themes and preview typography |
 | [scripts/screenshot.js](scripts/screenshot.js) | regenerates the README screenshots from the real app |
 | [scripts/icon.js](scripts/icon.js) | renders `build/icon.png` from an inline SVG |
+| [scripts/checksums.js](scripts/checksums.js) | writes `dist/SHA256SUMS-<platform>.txt` for the release |
 | [test/smoke.js](test/smoke.js) | end-to-end smoke test |
 
 No build step, no framework, no bundler — the renderer loads `marked`, `turndown`,
@@ -108,8 +172,8 @@ npm test          # or: npm run test:x11
 ```
 
 The test opens the real window hidden and checks markdown → HTML, HTML → markdown,
-formatted paste, plain-text paste, hostile-content sanitization and the context-menu
-rules.
+formatted paste, plain-text paste, hostile-content sanitization, the context-menu
+rules and the update-check version logic.
 
 ## Building
 
@@ -120,8 +184,16 @@ npm run screenshot    # regenerate assets/screenshot-*.png
 npm run icon          # regenerate build/icon.png
 ```
 
-Artifacts land in `dist/`. Cross-platform builds run on tag pushes via
-[the release workflow](.github/workflows/release.yml).
+Artifacts land in `dist/`.
+
+### Releasing
+
+1. Bump `version` in `package.json`, commit, then tag and push: `git tag v1.1.0 && git push --tags`.
+2. [The release workflow](.github/workflows/release.yml) builds every platform, adds
+   the checksum files and creates a **draft** release.
+3. Review the draft on GitHub, write the notes (they appear in the in-app update
+   dialog) and click **Publish release**. Drafts are invisible to users and to the
+   update check.
 
 ## Security
 

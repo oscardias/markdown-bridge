@@ -26,10 +26,17 @@ jobs:
 
       # Unsigned builds: no certificates are configured, so macOS and Windows
       # artifacts will trigger Gatekeeper / SmartScreen warnings. Documented in
-      # the README rather than papered over.
+      # the README ("Download") rather than papered over.
       - name: Build
         run: npx electron-builder --publish never
 
+      # Without signatures, published SHA-256 sums are what lets a user check that
+      # the file they downloaded is the one this job built.
+      - name: Checksums
+        run: node scripts/checksums.js
+
+      # Draft on purpose: review it, then press "Publish release" on GitHub.
+      # Only published releases are seen by the in-app update check.
       - uses: softprops/action-gh-release@v2
         with:
           draft: true
@@ -38,3 +45,4 @@ jobs:
             dist/*.deb
             dist/*.exe
             dist/*.dmg
+            dist/SHA256SUMS-*.txt
